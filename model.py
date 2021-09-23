@@ -1,14 +1,23 @@
 import random
 
 class AV:
-    def _init_(self, id, status):
-        self.id = id
+    def __init__(self, model, vID, status):
+        self.model = model
+        self.vID = vID
         self.status = status
+    
+    def broadcast(message, recipients):
+        pass
 
+    def witness(message):
+        pass
 
 class RSU:
-    # dictionary of dictionaries
-    reputation_scores = {}
+
+    def __init__(self, model, rID):
+        self.model = model
+        self.rID = rID
+        self.reputation_scores = {} # list of dictionaries
     
     def addReputationScore(self, vehicleA, vehicleB, score):
         cur_scores = dict()
@@ -27,6 +36,8 @@ class RSU:
             reputation_scores[vehicleA] = cur_scores
 
 
-ids = [i for i in range(300)]
-statuses = [random.randint(0, 3) for i in range(300)]
-nodes = [AV(ids[i], statuses[i]) for i in range(300)]
+class Model:
+    def __init__(self, n):
+        self.nodes = [AV(self, i, random.randint(0, 3)) for i in range(n)]
+
+model = Model(300)
