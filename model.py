@@ -1,5 +1,8 @@
 import random
 
+#nfd cxkldcm,x
+
+
 class AV:
     def __init__(self, model, vID, status):
         self.model = model
