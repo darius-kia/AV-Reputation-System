@@ -50,3 +50,4 @@ class Model:
         self.RSUs = [RSU(self, i, random.randint(0, 3)) for i in range(nRSUs)]
 
 model = Model(300)
+# test
