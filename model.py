@@ -1,8 +1,5 @@
 import random
 
-#nfd cxkldcm,x
-
-
 class AV:
     def __init__(self, model, vID, status):
         self.model = model
@@ -31,18 +28,16 @@ class RSU:
     def updateOperatingRep(self, sender, transaction):
         # update the reputation of sender AV using the transaction
         # does this by iterating through the witness scores for the transaction and get weighted average
-        tRep = sum(transaction.keys())/len(transaction)
+        tRep = 0
+        repSum = sum([self.reputation_scores[w] for w in transaction.keys()])
+        for w in transaction.keys():
+            weight = self.reputation_scores[w] / repSum
+            tRep += transaction[w] * weight
 
-        # TO-DO 
-        # Weight based on rating of witnesses (witness weight is proportional to their reputation; add up witness reps, divide each by sum and that's their weight)
-        # witnessA reputation is 0.2 (25% weight), witnessB reputation is 0.6 (75% weight) ; witnessA scores the transaction a 1, witnessB scores the transaction a 0; 1*.25 + 0*.75 = .25
-        # 0.2 / (0.2 + 0.6) -> 0.25
-
-        # update AV reputation with transactionReputation (tRep)
-        
         currRep = self.reputation_scores[sender]
         self.reputation_scores[sender] = tRep * 0.05 + currRep * 0.95
         # TO-DO weight based on recency AND number of witnesses
+        
 
     def updateReportingRep(self):
         pass
@@ -53,4 +48,3 @@ class Model:
         self.RSUs = [RSU(self, i, random.randint(0, 3)) for i in range(nRSUs)]
 
 model = Model(300)
-# test - github is very cool
