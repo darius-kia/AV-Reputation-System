@@ -1,4 +1,8 @@
 import random
+import matplotlib.pyplot as plt
+import matplotlib
+import time
+import numpy as np
 
 OPPOSITE = {1: 0, 0: 1}
 
@@ -8,7 +12,11 @@ class AV:
         self.vID = vID
         self.status = status
         #status: 0 = malicious, 1 = not malicious
-    def broadcast(recipients):
+
+    def __repr__(self):
+        return self.vID + f"({self.status})"
+
+    def broadcast(self, recipients):
         witnesses = random.sample(recipients, int(len(recipients)*random.random()*0.5)) # picks n number of witnesses where n is between 0 and 50% of the recipients
         r = random.choice(self.model.RSUs) # pick a random RSU
         transaction = {} # key is witness, value is witness's score
@@ -17,7 +25,7 @@ class AV:
            transaction[w] = w.score(self, expectedValue) # have each witness score the transaction
         r.updateOperatingRep(self, transaction)
 
-    def score(sender, expected):
+    def score(self, sender, expected):
         #score must take into account the status of the AV that is witnessing the transaction
         # score = random.choice([0, 1]) # make it depend on status
         
@@ -31,6 +39,9 @@ class RSU:
         self.rID = rID
         self.reputation_scores = {} # key is the av, value is its current reputation; should be stored by BS, RSU stores transaction info
     
+    def __repr__(self):
+        return self.rID
+
     def updateOperatingRep(self, sender, transaction):
         # update the reputation of sender AV using the transaction
         # does this by iterating through the witness scores for the transaction and get weighted average
@@ -41,7 +52,7 @@ class RSU:
             tRep += transaction[w] * weight
 
         currRep = self.reputation_scores[sender]
-        self.reputation_scores[sender] = tRep * 0.05 + currRep * 0.95 
+        self.reputation_scores[sender] = tRep * 0.05 + currRep * 0.95 # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
         # update reputation for every RSU
         # TO-DO weight based on recency AND number of witnesses
         
@@ -64,20 +75,31 @@ class Model:
         for r in self.RSUs:
             r.reputation_scores = reps # set the default reps for each rsu
     
-    def step():
+    def step(self):
         # tick = self.current_tick % 1440 # get tick of current day
         # if tick is 0:
         #     # end of day
         pass
         
+    def plot(self):
+        scores = self.RSUs[0].reputation_scores
+        x1 = [str(i) for i in scores.keys()]
+        y1 = list(scores.values()) 
+        plt.bar(x1, y1)
+        plt.show()
 
-    def run(self, n_days):
+
+    def run(self, n_transactions):
         self.initialize_reputations()
-        for i in range(n_days):
+        for i in range(n_transactions):
             av = random.choice(self.AVs)
             nRecipients = int(random.random()*10+10)
             recipients = random.sample([v for v in self.AVs if v is not av], nRecipients) # pick recipients as long as they aren't the sender
             av.broadcast(recipients)
         # for (int i = 0; i < n_days; i++){ broadcast ()}
 
-model = Model(300, 1, 0.9) # start off with 1 rsu
+model = Model(30, 1, 0.9) # start off with 1 rsu
+model.run(2000)
+scores = model.RSUs[0].reputation_scores
+print(scores)
+model.plot()
