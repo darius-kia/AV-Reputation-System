@@ -28,7 +28,7 @@ class AV:
     def score(self, sender, expected):
         #score must take into account the status of the AV that is witnessing the transaction
         # score = random.choice([0, 1]) # make it depend on status
-        
+        # if a vehicle that is scoring a transaction has its reputation fall below 0.4 disregards the scoring from the vehicle
         return expected if self.status == 1 else OPPOSITE[expected]
         # add nuance; good vehicles sometimes give bad scores
 
@@ -85,6 +85,7 @@ class Model:
         scores = self.RSUs[0].reputation_scores
         x1 = [str(i) for i in scores.keys()]
         y1 = list(scores.values()) 
+        plt.xticks(rotation=90)
         plt.bar(x1, y1)
         plt.show()
 
