@@ -23,7 +23,7 @@ class AV:
         expectedValue = self.status # change later once more statuses
         for w in witnesses:
            transaction[w] = w.score(self, expectedValue) # have each witness score the transaction
-        r.updateOperatingRep(self, transaction)
+        r.updateOperatingRep(self, transaction, 0.05)
 
     def score(self, sender, expected):
         #score must take into account the status of the AV that is witnessing the transaction
@@ -42,7 +42,7 @@ class RSU:
     def __repr__(self):
         return self.rID
 
-    def updateOperatingRep(self, sender, transaction):
+    def updateOperatingRep(self, sender, transaction, velocity):
         # update the reputation of sender AV using the transaction
         # does this by iterating through the witness scores for the transaction and get weighted average
         tRep = 0
@@ -52,7 +52,7 @@ class RSU:
             tRep += transaction[w] * weight
 
         currRep = self.reputation_scores[sender]
-        self.reputation_scores[sender] = tRep * 0.05 + currRep * 0.95 # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
+        self.reputation_scores[sender] = tRep * velocity + currRep * (1-velocity) # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
         # update reputation for every RSU
         # TO-DO weight based on recency AND number of witnesses
         
