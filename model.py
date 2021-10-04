@@ -24,6 +24,8 @@ class AV:
         for w in witnesses:
            transaction[w] = w.score(self, expectedValue) # have each witness score the transaction
         r.updateOperatingRep(self, transaction, 0.05)
+        for w in witnesses:
+           r.updateReportingRep(w, transaction, 0.05) # update the reputation of each witness
 
     def score(self, sender, expected):
         #score must take into account the status of the AV that is witnessing the transaction
@@ -37,7 +39,8 @@ class RSU:
     def __init__(self, model, rID):
         self.model = model
         self.rID = rID
-        self.reputation_scores = {} # key is the av, value is its current reputation; should be stored by BS, RSU stores transaction info
+        self.operating_scores = {} # key is the av, value is its current reputation; should be stored by BS, RSU stores transaction info
+        self.reporting_scores = {}
     
     def __repr__(self):
         return self.rID
@@ -46,19 +49,29 @@ class RSU:
         # update the reputation of sender AV using the transaction
         # does this by iterating through the witness scores for the transaction and get weighted average
         tRep = 0
-        repSum = sum([self.reputation_scores[w] for w in transaction.keys()])
+        repSum = sum([self.operating_scores[w] for w in transaction.keys()])
         for w in transaction.keys():
-            weight = self.reputation_scores[w] / repSum
+            weight = self.operating_scores[w] / repSum
             tRep += transaction[w] * weight
 
-        currRep = self.reputation_scores[sender]
-        self.reputation_scores[sender] = tRep * velocity + currRep * (1-velocity) # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
+        currRep = self.operating_scores[sender]
+        self.operating_scores[sender] = tRep * velocity + currRep * (1-velocity) # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
         # update reputation for every RSU
         # TO-DO weight based on recency AND number of witnesses
         
 
-    def updateReportingRep(self):
-        pass
+    def updateReportingRep(self, witness, transaction, velocity):
+        # Calculate the average score based on the same method as used in Operating Reputation
+        # 0.2 rep vehicle (malicious) reports 0 on a good transaction and 0.9 rep vehicle (non-malicious) reports 1 on a good transaction
+        oRep = 0
+        repSum = sum([self.operating_scores[w] for w in transaction.keys()])
+        for w in transaction.keys():
+            weight = self.operating_scores[w] / repSum
+            oRep += transaction[w] * weight
+        deviation = 1 - ((transaction[w] * weight) - oRep)
+        currRep = self.reporting_scores[witness]
+        self.reporting_scores[witness] = deviation * velocity + currRep * (1-velocity)
+
 
 class Model:
     def __init__(self, nAVs, nRSUs, propNormal):
@@ -73,7 +86,8 @@ class Model:
     def initialize_reputations(self):
         reps = {av: 1.0 for av in self.AVs} # give each av a default of 1.0
         for r in self.RSUs:
-            r.reputation_scores = reps # set the default reps for each rsu
+            r.operating_scores = reps # set the default operating score for each rsu
+            r.reporting_scores = reps # set the default reporting score for each rsu
     
     def step(self):
         # tick = self.current_tick % 1440 # get tick of current day
@@ -81,14 +95,21 @@ class Model:
         #     # end of day
         pass
         
-    def plot(self):
-        scores = self.RSUs[0].reputation_scores
+    def plotOperating(self):
+        scores = self.RSUs[0].operating_scores
         x1 = [str(i) for i in scores.keys()]
         y1 = list(scores.values()) 
         plt.xticks(rotation=90)
         plt.bar(x1, y1)
         plt.show()
 
+    def plotReporting(self):
+        scores = self.RSUs[0].reporting_scores
+        x1 = [str(i) for i in scores.keys()]
+        y1 = list(scores.values()) 
+        plt.xticks(rotation=90)
+        plt.bar(x1, y1)
+        plt.show()
 
     def run(self, n_transactions):
         self.initialize_reputations()
@@ -101,6 +122,6 @@ class Model:
 
 model = Model(30, 1, 0.9) # start off with 1 rsu
 model.run(2000)
-scores = model.RSUs[0].reputation_scores
+scores = model.RSUs[0].reporting_scores
 print(scores)
-model.plot()
+model.plotReporting()
