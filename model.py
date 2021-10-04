@@ -64,11 +64,11 @@ class RSU:
         # Calculate the average score based on the same method as used in Operating Reputation
         # 0.2 rep vehicle (malicious) reports 0 on a good transaction and 0.9 rep vehicle (non-malicious) reports 1 on a good transaction
         oRep = 0
-        repSum = sum([self.operating_scores[w] for w in transaction.keys()])
+        repSum = sum([self.reporting_scores[w] for w in transaction.keys()])
         for w in transaction.keys():
-            weight = self.operating_scores[w] / repSum
+            weight = self.reporting_scores[w] / repSum
             oRep += transaction[w] * weight
-        deviation = 1 - ((transaction[w] * weight) - oRep)
+        deviation = 1 - abs(transaction[w] - oRep)
         currRep = self.reporting_scores[witness]
         self.reporting_scores[witness] = deviation * velocity + currRep * (1-velocity)
 
@@ -86,8 +86,8 @@ class Model:
     def initialize_reputations(self):
         reps = {av: 1.0 for av in self.AVs} # give each av a default of 1.0
         for r in self.RSUs:
-            r.operating_scores = reps # set the default operating score for each rsu
-            r.reporting_scores = reps # set the default reporting score for each rsu
+            r.operating_scores = {av: 1.0 for av in self.AVs} # give each av a default of 1.0
+            r.reporting_scores = {av: 1.0 for av in self.AVs} # give each av a default of 1.0
     
     def step(self):
         # tick = self.current_tick % 1440 # get tick of current day
