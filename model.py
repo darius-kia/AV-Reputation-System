@@ -84,7 +84,6 @@ class Model:
         # self.current_tick = 0
     
     def initialize_reputations(self):
-        reps = {av: 1.0 for av in self.AVs} # give each av a default of 1.0
         for r in self.RSUs:
             r.operating_scores = {av: 1.0 for av in self.AVs} # give each av a default of 1.0
             r.reporting_scores = {av: 1.0 for av in self.AVs} # give each av a default of 1.0
