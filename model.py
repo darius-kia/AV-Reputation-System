@@ -23,9 +23,9 @@ class AV:
         expectedValue = self.status # change later once more statuses
         for w in witnesses:
            transaction[w] = w.score(self, expectedValue) # have each witness score the transaction
-        r.updateOperatingRep(self, transaction, 0.05)
+        r.updateOperatingRep(self, transaction, 0.05, weightWitnessRep=True)
         for w in witnesses:
-           r.updateReportingRep(w, transaction, 0.05, weightWitnessRep=False) # update the reputation of each witness
+           r.updateReportingRep(w, transaction, 0.05, weightWitnessRep=True) # update the reputation of each witness
 
     def score(self, sender, expected):
         #score must take into account the status of the AV that is witnessing the transaction
@@ -49,10 +49,10 @@ class RSU:
         # update the reputation of sender AV using the transaction
         # does this by iterating through the witness scores for the transaction and get weighted average
         oRep = 0
-        repSum = sum([self.operating_scores[w] for w in transaction.keys()])
+        repSum = sum([self.reporting_scores[w] for w in transaction.keys()])
         if weightWitnessRep:
             for w in transaction.keys():
-                weight = self.operating_scores[w] / repSum
+                weight = self.reporting_scores[w] / repSum
                 oRep += transaction[w] * weight
         else: # not weighting by witness reputations
             oRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
@@ -144,6 +144,6 @@ class Model:
 
 model = Model(30, 1, 0.9) # start off with 1 rsu
 model.run(2000)
-# scores = model.RSUs[0].operating_scores
-# print(scores)
-# model.plotOperating()
+scores = model.RSUs[0].operating_scores
+#print(scores)
+model.plotOperating()
