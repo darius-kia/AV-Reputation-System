@@ -25,7 +25,7 @@ class AV:
            transaction[w] = w.score(self, expectedValue) # have each witness score the transaction
         r.updateOperatingRep(self, transaction, 0.05)
         for w in witnesses:
-           r.updateReportingRep(w, transaction, 0.05) # update the reputation of each witness
+           r.updateReportingRep(w, transaction, 0.05, weightWitnessRep=False) # update the reputation of each witness
 
     def score(self, sender, expected):
         #score must take into account the status of the AV that is witnessing the transaction
@@ -54,7 +54,7 @@ class RSU:
             for w in transaction.keys():
                 weight = self.operating_scores[w] / repSum
                 oRep += transaction[w] * weight
-        else:
+        else: # not weighting by witness reputations
             oRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
         currRep = self.operating_scores[sender]
         self.operating_scores[sender] = oRep * velocity + currRep * (1-velocity) # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
@@ -62,15 +62,18 @@ class RSU:
         # TO-DO weight based on recency AND number of witnesses
         
 
-    def updateReportingRep(self, witness, transaction, velocity):
+    def updateReportingRep(self, witness, transaction, velocity, weightWitnessRep=True):
         # Calculate the average score based on the same method as used in Operating Reputation
         # 0.2 rep vehicle (malicious) reports 0 on a good transaction and 0.9 rep vehicle (non-malicious) reports 1 on a good transaction
         rRep = 0
-        repSum = sum([self.reporting_scores[w] for w in transaction.keys()])
-        for w in transaction.keys():
-            weight = self.reporting_scores[w] / repSum
-            rRep += transaction[w] * weight
-        deviation = 1 - abs(transaction[w] - rRep)
+        if weightWitnessRep:
+            repSum = sum([self.reporting_scores[w] for w in transaction.keys()])
+            for w in transaction.keys():
+                weight = self.reporting_scores[w] / repSum
+                rRep += transaction[w] * weight
+        else: # not weighting by witness reputations
+            rRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
+        deviation = 1 - abs(transaction[witness] - rRep)
         currRep = self.reporting_scores[witness]
         self.reporting_scores[witness] = deviation * velocity + currRep * (1-velocity)
 
@@ -112,7 +115,22 @@ class Model:
         plt.bar(x1, y1)
         plt.show()    
 
-    def run(self, n_transactions):
+
+    def calculateOperatingError(self):
+        err = 0
+        op_scores = self.RSUs[0].operating_scores
+        for av in op_scores:
+            err += abs(av.status - op_scores[av])
+        return err / len(op_scores)
+
+    def calculateReportingError(self):
+        err = 0
+        re_scores = self.RSUs[0].reporting_scores
+        for av in re_scores:
+            err += abs(av.status - re_scores[av])
+        return err / len(re_scores)
+
+    def run(self, n_transactions, print_error=True):
         self.initialize_reputations()
         for i in range(n_transactions):
             av = random.choice(self.AVs)
@@ -120,9 +138,12 @@ class Model:
             recipients = random.sample([v for v in self.AVs if v is not av], nRecipients) # pick recipients as long as they aren't the sender
             av.broadcast(recipients)
         # for (int i = 0; i < n_days; i++){ broadcast ()}
+        if print_error:
+            print(f"Operating Error: {self.calculateOperatingError()}")
+            print(f"Reporting Error: {self.calculateReportingError()}")
 
 model = Model(30, 1, 0.9) # start off with 1 rsu
 model.run(2000)
-scores = model.RSUs[0].reporting_scores
-print(scores)
-model.plotOperating()
+# scores = model.RSUs[0].operating_scores
+# print(scores)
+# model.plotOperating()
