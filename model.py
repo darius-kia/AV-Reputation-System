@@ -17,7 +17,7 @@ class AV:
         return self.vID + f"({self.status})"
 
     def broadcast(self, recipients):
-        witnesses = random.sample(recipients, int(len(recipients)*random.random()*0.5)) # picks n number of witnesses where n is between 0 and 50% of the recipients
+        witnesses = random.sample(recipients, int(len(recipients)*random.random()*0.5+1)) # picks n number of witnesses where n is between 0 and 50% of the recipients
         r = random.choice(self.model.RSUs) # pick a random RSU
         transaction = {} # key is witness, value is witness's score
         expectedValue = self.status # change later once more statuses
@@ -45,17 +45,19 @@ class RSU:
     def __repr__(self):
         return self.rID
 
-    def updateOperatingRep(self, sender, transaction, velocity):
+    def updateOperatingRep(self, sender, transaction, velocity, weightWitnessRep=True):
         # update the reputation of sender AV using the transaction
         # does this by iterating through the witness scores for the transaction and get weighted average
-        tRep = 0
+        oRep = 0
         repSum = sum([self.operating_scores[w] for w in transaction.keys()])
-        for w in transaction.keys():
-            weight = self.operating_scores[w] / repSum
-            tRep += transaction[w] * weight
-
+        if weightWitnessRep:
+            for w in transaction.keys():
+                weight = self.operating_scores[w] / repSum
+                oRep += transaction[w] * weight
+        else:
+            oRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
         currRep = self.operating_scores[sender]
-        self.operating_scores[sender] = tRep * velocity + currRep * (1-velocity) # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
+        self.operating_scores[sender] = oRep * velocity + currRep * (1-velocity) # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
         # update reputation for every RSU
         # TO-DO weight based on recency AND number of witnesses
         
@@ -63,12 +65,12 @@ class RSU:
     def updateReportingRep(self, witness, transaction, velocity):
         # Calculate the average score based on the same method as used in Operating Reputation
         # 0.2 rep vehicle (malicious) reports 0 on a good transaction and 0.9 rep vehicle (non-malicious) reports 1 on a good transaction
-        oRep = 0
+        rRep = 0
         repSum = sum([self.reporting_scores[w] for w in transaction.keys()])
         for w in transaction.keys():
             weight = self.reporting_scores[w] / repSum
-            oRep += transaction[w] * weight
-        deviation = 1 - abs(transaction[w] - oRep)
+            rRep += transaction[w] * weight
+        deviation = 1 - abs(transaction[w] - rRep)
         currRep = self.reporting_scores[witness]
         self.reporting_scores[witness] = deviation * velocity + currRep * (1-velocity)
 
@@ -108,7 +110,7 @@ class Model:
         y1 = list(scores.values()) 
         plt.xticks(rotation=90)
         plt.bar(x1, y1)
-        plt.show()
+        plt.show()    
 
     def run(self, n_transactions):
         self.initialize_reputations()
@@ -123,4 +125,4 @@ model = Model(30, 1, 0.9) # start off with 1 rsu
 model.run(2000)
 scores = model.RSUs[0].reporting_scores
 print(scores)
-model.plotReporting()
+model.plotOperating()
