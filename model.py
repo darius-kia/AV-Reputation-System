@@ -22,16 +22,26 @@ class AV:
         transaction = {} # key is witness, value is witness's score
         expectedValue = self.status # change later once more statuses
         for w in witnesses:
-           transaction[w] = w.score(self, expectedValue) # have each witness score the transaction
+           transaction[w] = w.score(self, expectedValue, 0.95) # have each witness score the transaction
         r.updateOperatingRep(self, transaction, 0.05, weightWitnessRep=True)
         for w in witnesses:
            r.updateReportingRep(w, transaction, 0.05, weightWitnessRep=True) # update the reputation of each witness
 
-    def score(self, sender, expected):
+    def score(self, sender, expected, noise):
         #score must take into account the status of the AV that is witnessing the transaction
         # score = random.choice([0, 1]) # make it depend on status
         # if a vehicle that is scoring a transaction has its reputation fall below 0.4 disregards the scoring from the vehicle
-        return expected if self.status == 1 else OPPOSITE[expected]
+        if self.status == 1:
+            if random.random() < noise:
+                return expected 
+            else:
+                return OPPOSITE[expected]
+        elif self.status == 0:
+            if random.random() < noise:
+                return OPPOSITE[expected]
+            else:
+                return expected
+
         # add nuance; good vehicles sometimes give bad scores
 
 class RSU:
