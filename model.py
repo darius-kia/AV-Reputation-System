@@ -20,10 +20,11 @@ class AV:
         witnesses = random.sample(recipients, int(len(recipients)*random.random()*0.5+1)) # picks n number of witnesses where n is between 0 and 50% of the recipients
         r = random.choice(self.model.RSUs) # pick a random RSU
         transaction = {} # key is witness, value is witness's score
-        expectedValue = self.status # change later once more statuses
+        expectedValue = self.status # change later once more statuses // add noise
         for w in witnesses:
            transaction[w] = w.score(self, expectedValue, 0.95) # have each witness score the transaction
-        r.updateOperatingRep(self, transaction, 0.05, weightWitnessRep=True)
+        r.addTransaction(transaction)
+        r.updateOperatingRep(self, transaction, 0.05, True, True)
         for w in witnesses:
            r.updateReportingRep(w, transaction, 0.05, weightWitnessRep=True) # update the reputation of each witness
 
@@ -51,11 +52,19 @@ class RSU:
         self.rID = rID
         self.operating_scores = {} # key is the av, value is its current reputation; should be stored by BS, RSU stores transaction info
         self.reporting_scores = {}
+        self.transactions = []
+        self.avgWitnesses = 0
     
     def __repr__(self):
         return self.rID
 
-    def updateOperatingRep(self, sender, transaction, velocity, weightWitnessRep=True):
+    def addTransaction(self, newT): 
+        # update avg witnesses
+        self.avgWitnesses = ((self.avgWitnesses * len(self.transactions)) + len(newT)) / (len(self.transactions) + 1)
+        # note: does not update prior transactions
+        self.transactions.append(newT)
+
+    def updateOperatingRep(self, sender, transaction, velocity, weightWitnessRep=True, weightNumWitnesses=True):
         # update the reputation of sender AV using the transaction
         # does this by iterating through the witness scores for the transaction and get weighted average
         oRep = 0
@@ -66,7 +75,15 @@ class RSU:
                 oRep += transaction[w] * weight
         else: # not weighting by witness reputations
             oRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
+
+        if weightNumWitnesses:
+            k = 2
+            diff = len(transaction) - self.avgWitnesses
+            shift = diff / k
+            velocity += (shift*0.01)
+
         currRep = self.operating_scores[sender]
+        
         self.operating_scores[sender] = oRep * velocity + currRep * (1-velocity) # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
         # update reputation for every RSU
         # TO-DO weight based on recency AND number of witnesses
