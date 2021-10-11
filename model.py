@@ -131,21 +131,27 @@ class Model:
         #     # end of day
         pass
         
-    def plotOperating(self):
-        scores = self.RSUs[0].operating_scores
-        x1 = [str(i) for i in scores.keys()]
-        y1 = list(scores.values()) 
-        plt.xticks(rotation=90)
-        plt.bar(x1, y1)
+    def plotScores(self, showOperating=True, showReporting=True):
+        oScores = self.RSUs[0].operating_scores
+        rScores = self.RSUs[0].reporting_scores
+
+        X = [str(i) for i in oScores.keys()]
+
+        X_axis = np.arange(len(X))
+
+        y1 = list(oScores.values()) 
+        y2 = list(rScores.values()) 
+
+        if showOperating: plt.bar(X_axis - 0.2, y1, 0.4, label = 'Operating')
+        if showReporting: plt.bar(X_axis + 0.2, y2, 0.4, label = 'Reporting')
+
+        plt.xticks(X_axis, X, rotation=90)
+        plt.xlabel("Vehicles")
+        plt.ylabel("Score")
+        plt.title("AV Operating and Reporting Scores")
+        plt.legend()
         plt.show()
 
-    def plotReporting(self):
-        scores = self.RSUs[0].reporting_scores
-        x1 = [str(i) for i in scores.keys()]
-        y1 = list(scores.values()) 
-        plt.xticks(rotation=90)
-        plt.bar(x1, y1)
-        plt.show()    
 
 
     def calculateOperatingError(self):
@@ -165,7 +171,7 @@ class Model:
     def turn(self):
         prob = random.random()
         if prob < 0.9:
-            if prob > 0.8:
+            if prob > 0.5:
                 av = random.choice(self.mAVs) # pick a malicious AV
             else:
                 av = random.choice(self.nAVs) # pick a normal AV
@@ -185,4 +191,4 @@ class Model:
 model = Model(30, 1, 0.9) # start off with 1 rsu
 model.run(2000)
 scores = model.RSUs[0].operating_scores
-# model.plotOperating()
+model.plotScores(showReporting=False)
