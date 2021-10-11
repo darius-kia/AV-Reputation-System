@@ -110,8 +110,13 @@ class Model:
         # 270 status 0, 15 status 1, 10 status 2, 5 status 3
         # Decide how many AVs of each type (not random -> could use proportions later on in the simulation)
         # 90% good vehicles and 10% malicous vehicles
-        statuses = [1]*int(round(nAVs*propNormal)) + [0]*(int(round(nAVs*(1-propNormal))))
+        numN = int(round(nAVs*propNormal))
+        numM = int(round(nAVs*(1-propNormal)))
+        statuses = [1]*numN + [0]*numM
         self.AVs = [AV(self, f"AV_{i}", statuses[i]) for i in range(nAVs)]
+        self.nAVs = self.AVs[:numN] # normal AVs
+        self.mAVs = self.AVs[numN:] # malicious AVs
+
         self.RSUs = [RSU(self, f"RSU_{i}") for i in range(nRSUs)]
         # self.current_tick = 0
     
@@ -157,13 +162,21 @@ class Model:
             err += abs(av.status - re_scores[av])
         return err / len(re_scores)
 
-    def run(self, n_transactions, print_error=True):
-        self.initialize_reputations()
-        for i in range(n_transactions):
-            av = random.choice(self.AVs)
+    def turn(self):
+        prob = random.random()
+        if prob < 0.9:
+            if prob > 0.8:
+                av = random.choice(self.mAVs) # pick a malicious AV
+            else:
+                av = random.choice(self.nAVs) # pick a normal AV
             nRecipients = int(random.random()*10+10)
             recipients = random.sample([v for v in self.AVs if v is not av], nRecipients) # pick recipients as long as they aren't the sender
             av.broadcast(recipients)
+
+    def run(self, n_turns, print_error=True):
+        self.initialize_reputations()
+        for i in range(n_turns):
+            self.turn()
         # for (int i = 0; i < n_days; i++){ broadcast ()}
         if print_error:
             print(f"Operating Error: {self.calculateOperatingError()}")
@@ -172,5 +185,4 @@ class Model:
 model = Model(30, 1, 0.9) # start off with 1 rsu
 model.run(2000)
 scores = model.RSUs[0].operating_scores
-#print(scores)
-model.plotOperating()
+# model.plotOperating()
