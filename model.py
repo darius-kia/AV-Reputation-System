@@ -1,26 +1,33 @@
 import random
 import matplotlib.pyplot as plt
-import matplotlib
 import time
 import numpy as np
 
 OPPOSITE = {1: 0, 0: 1}
+STATUSES = {0: 'MAL', 1: 'NORM', 2: 'MAL_OP', 3: 'MAL_REP'}
+# STATUSES:
+# 0: PURE MALICIOUS
+# 1: NORMAL
+# 2: MALICIOUS OPERATING
+# 3: MALICIOUS REPORTING
 
 class AV:
     def __init__(self, model, vID, status):
         self.model = model
         self.vID = vID
         self.status = status
-        #status: 0 = malicious, 1 = not malicious
 
     def __repr__(self):
-        return self.vID + f"({self.status})"
+        return self.vID + f"({STATUSES[self.status]})"
 
-    def broadcast(self, recipients):
+    def broadcast(self, recipients, noise=0.95):
         witnesses = random.sample(recipients, int(len(recipients)*random.random()*0.5+1)) # picks n number of witnesses where n is between 0 and 50% of the recipients
         r = random.choice(self.model.RSUs) # pick a random RSU
         transaction = {} # key is witness, value is witness's score
-        expectedValue = self.status # change later once more statuses // add noise
+
+        expectedValue = 1 if self.status in [1, 3] else 0
+        if random.random() < noise:
+            expectedValue = OPPOSITE[expectedValue]
         for w in witnesses:
            transaction[w] = w.score(self, expectedValue, 0.95) # have each witness score the transaction
         r.addTransaction(transaction)
@@ -28,20 +35,14 @@ class AV:
         for w in witnesses:
            r.updateReportingRep(w, transaction, 0.05, weightWitnessRep=True) # update the reputation of each witness
 
-    def score(self, sender, expected, noise):
+    def score(self, sender, expected, noise=0.95):
         #score must take into account the status of the AV that is witnessing the transaction
         # score = random.choice([0, 1]) # make it depend on status
         # if a vehicle that is scoring a transaction has its reputation fall below 0.4 disregards the scoring from the vehicle
-        if self.status == 1:
-            if random.random() < noise:
-                return expected 
-            else:
-                return OPPOSITE[expected]
-        elif self.status == 0:
-            if random.random() < noise:
-                return OPPOSITE[expected]
-            else:
-                return expected
+        wScore = expected if self.status in [1, 2] else OPPOSITE[expected]
+        if random.random() < noise:
+            wScore = OPPOSITE[wScore]
+        return wScore
 
         # add nuance; good vehicles sometimes give bad scores
 
@@ -158,20 +159,22 @@ class Model:
         err = 0
         op_scores = self.RSUs[0].operating_scores
         for av in op_scores:
-            err += abs(av.status - op_scores[av])
+            expectedRep = 1 if av.status in [1, 3] else 0
+            err += abs(expectedRep - op_scores[av])
         return err / len(op_scores)
 
     def calculateReportingError(self):
         err = 0
         re_scores = self.RSUs[0].reporting_scores
         for av in re_scores:
-            err += abs(av.status - re_scores[av])
+            expectedRep = 1 if av.status in [1, 2] else 0
+            err += abs(expectedRep - re_scores[av])
         return err / len(re_scores)
 
     def turn(self):
         prob = random.random()
         if prob < 0.9:
-            if prob > 0.5:
+            if prob > 0.8:
                 av = random.choice(self.mAVs) # pick a malicious AV
             else:
                 av = random.choice(self.nAVs) # pick a normal AV
@@ -191,4 +194,4 @@ class Model:
 model = Model(30, 1, 0.9) # start off with 1 rsu
 model.run(2000)
 scores = model.RSUs[0].operating_scores
-model.plotScores(showReporting=False)
+model.plotScores()
