@@ -35,15 +35,22 @@ class AV:
         for w in witnesses:
            r.updateReportingRep(w, transaction, 0.05, weightWitnessRep=True) # update the reputation of each witness
 
-    def score(self, sender, expected, noise=0.95):
+    def score(self, sender, expected, quartiles=True, noise=0.95):
         #score must take into account the status of the AV that is witnessing the transaction
         # score = random.choice([0, 1]) # make it depend on status
         # if a vehicle that is scoring a transaction has its reputation fall below 0.4 disregards the scoring from the vehicle
-        wScore = expected if self.status in [1, 2] else OPPOSITE[expected]
-        if random.random() < noise:
-            wScore = OPPOSITE[wScore]
-        return wScore
+        scores = [0, 0.25, 0.75, 1]
+        wScore = -99
+        if quartiles:
+            wScore = expected if self.status in [1, 2] else OPPOSITE[expected]
+            if random.random() < noise:
+                wScore = random.choice([i for i in scores if i != wScore])
 
+        else:
+            wScore = expected if self.status in [1, 2] else OPPOSITE[expected]
+            if random.random() < noise:
+                wScore = OPPOSITE[wScore]
+        return wScore
         # add nuance; good vehicles sometimes give bad scores
 
 class RSU:
@@ -90,20 +97,29 @@ class RSU:
         # TO-DO weight based on recency AND number of witnesses
         
 
-    def updateReportingRep(self, witness, transaction, velocity, weightWitnessRep=True):
+    def updateReportingRep(self, witness, transaction, velocity, weightWitnessRep=True, quartiles=True):
         # Calculate the average score based on the same method as used in Operating Reputation
         # 0.2 rep vehicle (malicious) reports 0 on a good transaction and 0.9 rep vehicle (non-malicious) reports 1 on a good transaction
-        rRep = 0
-        if weightWitnessRep:
-            repSum = sum([self.reporting_scores[w] for w in transaction.keys()])
-            for w in transaction.keys():
-                weight = self.reporting_scores[w] / repSum
-                rRep += transaction[w] * weight
-        else: # not weighting by witness reputations
-            rRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
-        deviation = 1 - abs(transaction[witness] - rRep)
-        currRep = self.reporting_scores[witness]
-        self.reporting_scores[witness] = deviation * velocity + currRep * (1-velocity)
+        if quartiles:
+           rRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
+           snapped = round(rRep*4)/4
+           match = 1 if snapped == transaction[witness] else 0
+           deviation = 1 - abs(transaction[witness] - rRep)
+           currRep = self.reporting_scores[witness]
+           self.reporting_scores[witness] = deviation * velocity + currRep * (1-velocity)
+ 
+        else:
+            rRep = 0
+            if weightWitnessRep:
+                repSum = sum([self.reporting_scores[w] for w in transaction.keys()])
+                for w in transaction.keys():
+                    weight = self.reporting_scores[w] / repSum
+                    rRep += transaction[w] * weight
+            else: # not weighting by witness reputations
+                rRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
+            deviation = 1 - abs(transaction[witness] - rRep)
+            currRep = self.reporting_scores[witness]
+            self.reporting_scores[witness] = deviation * velocity + currRep * (1-velocity)
 
 
 class Model:
@@ -193,5 +209,5 @@ class Model:
 
 model = Model(30, 1, 0.9) # start off with 1 rsu
 model.run(2000)
-scores = model.RSUs[0].operating_scores
+# scores = model.RSUs[0].operating_scores
 model.plotScores()
