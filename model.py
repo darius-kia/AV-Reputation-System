@@ -2,9 +2,73 @@ import random
 import matplotlib.pyplot as plt
 import time
 import numpy as np
-
+import sys
 OPPOSITE = {1: 0, 0: 1}
 STATUSES = {0: 'MAL', 1: 'NORM', 2: 'MAL_OP', 3: 'MAL_REP'}
+
+PARAMS = []
+
+# 0: velocity
+# 1: byWitnessRep
+# 2: byNumWitnesses
+# 3: propNormal
+# 4: broadcastNoise
+# 5: witnessNoise
+# 6: numVehicles
+# 7: minRecipients
+# 8: maxRecipients
+# 9: propWitnesses
+# 10: useMalOp
+# 11: useMalRep
+# 12: useQuartiles
+# 13: numTurns
+# 14: percTransaction
+# 15: percMalicious
+
+args = sys.argv[1:]
+assert(len(args) > 16 or len(args) == 0), "Must include all arguments"
+if len(args) == 0: # set default values
+    PARAMS = [
+        0.95, # 0
+        True, # 1
+        True,
+        0.9,
+        0.05,
+        0.05,
+        30,
+        10,
+        20,
+        0.5,
+        True,
+        True,
+        False,
+        2000,
+        0.9,
+        0.1
+    ]
+else:
+    PARAMS = args
+
+
+# class Params:
+#     def __init__(self, velocity, byWitnessRep, byNumWitnesses, propNormal, broadcastNoise, witnessNoise, numVehicles, minRecipients, maxRecipients, propWitnesses, useMalOp, useMalRep, useQuartiles, numTurns, percTransaction, percMalicious):
+#         self.velocity = velocity
+#         self.byWitnessRep = byWitnessRep
+#         self.byNumWitnesses = byNumWitnesses
+#         self.propNormal = propNormal
+#         self.broadcastNoise = broadcastNoise
+#         self.witnessNoise = witnessNoise
+#         self.numVehicles = numVehicles
+#         self.minRecipients = minRecipients
+#         self.maxRecipients = maxRecipients
+#         self.propWitnesses = propWitnesses
+#         self.useMalOp = useMalOp
+#         self.useMalRep = useMalRep
+#         self.useQuartiles = useQuartiles
+#         self.numTurns = numTurns
+#         self.percTransaction = percTransaction
+#         self.percMalicious = percMalicious
+
 
 class AV:
     def __init__(self, model, vID, status):
@@ -15,8 +79,8 @@ class AV:
     def __repr__(self):
         return self.vID + f"({STATUSES[self.status]})"
 
-    def broadcast(self, recipients, noise=0.05):
-        witnesses = random.sample(recipients, int(len(recipients)*random.random()*0.5+1)) # picks n number of witnesses where n is between 0 and 50% of the recipients
+    def broadcast(self, recipients, noise=PARAMS[4]):
+        witnesses = random.sample(recipients, int(len(recipients)*random.random()*PARAMS[9]+1)) # picks n number of witnesses where n is between 0 and k% of the recipients
         r = random.choice(self.model.RSUs) # pick a random RSU
         transaction = {} # key is witness, value is witness's score
 
@@ -30,7 +94,7 @@ class AV:
         for w in witnesses:
            r.updateReportingRep(w, transaction, 0.05, weightWitnessRep=True) # update the reputation of each witness
 
-    def score(self, sender, expected, quartiles=False, noise=0.05):
+    def score(self, sender, expected, quartiles=PARAMS[12], noise=PARAMS[5]):
         #score must take into account the status of the AV that is witnessing the transaction
         # score = random.choice([0, 1]) # make it depend on status
         # if a vehicle that is scoring a transaction has its reputation fall below 0.4 disregards the scoring from the vehicle
@@ -65,7 +129,7 @@ class RSU:
         # note: does not update prior transactions
         self.transactions.append(newT)
 
-    def updateOperatingRep(self, sender, transaction, velocity, weightWitnessRep=True, weightNumWitnesses=True):
+    def updateOperatingRep(self, sender, transaction, velocity, weightWitnessRep=PARAMS[1], weightNumWitnesses=PARAMS[2]):
         # update the reputation of sender AV using the transaction
         # does this by iterating through the witness scores for the transaction and get weighted average
         oRep = 0
@@ -90,7 +154,7 @@ class RSU:
         # TO-DO weight based on recency AND number of witnesses
         
 
-    def updateReportingRep(self, witness, transaction, velocity, weightWitnessRep=True, quartiles=False):
+    def updateReportingRep(self, witness, transaction, velocity=PARAMS[0], weightWitnessRep=True, quartiles=PARAMS[12]):
         # Calculate the average score based on the same method as used in Operating Reputation
         # 0.2 rep vehicle (malicious) reports 0 on a good transaction and 0.9 rep vehicle (non-malicious) reports 1 on a good transaction
         if quartiles:
@@ -115,7 +179,7 @@ class RSU:
 
 
 class Model:
-    def __init__(self, nAVs, nRSUs, propNormal):
+    def __init__(self, nAVs=PARAMS[6], nRSUs=1, propNormal=PARAMS[3]):
         # 270 status 0, 15 status 1, 10 status 2, 5 status 3
         # Decide how many AVs of each type (not random -> could use proportions later on in the simulation)
         # 90% good vehicles and 10% malicous vehicles
@@ -184,16 +248,18 @@ class Model:
 
     def turn(self):
         prob = random.random()
-        if prob < 0.9:
-            if prob > 0.8:
+        if prob < PARAMS[14]:
+            if prob > (PARAMS[14]-PARAMS[15]):
                 av = random.choice(self.mAVs) # pick a malicious AV
             else:
                 av = random.choice(self.nAVs) # pick a normal AV
-            nRecipients = int(random.random()*10+10)
+            # move recipient selection into av.broadcast
+            nRecipients = int(random.random()*(PARAMS[8]-PARAMS[7])+PARAMS[7])
             recipients = random.sample([v for v in self.AVs if v is not av], nRecipients) # pick recipients as long as they aren't the sender
             av.broadcast(recipients)
 
-    def run(self, n_turns, print_error=True):
+    def run(self, n_turns=PARAMS[13], print_error=True):
+        # include runtime
         self.initialize_reputations()
         for i in range(n_turns):
             self.turn()
@@ -201,6 +267,8 @@ class Model:
         if print_error:
             print(f"Operating Error: {self.calculateOperatingError()}")
             print(f"Reporting Error: {self.calculateReportingError()}")
+        
+
 
 model = Model(33, 1, 0.9) # start off with 1 rsu
 model.run(2000)
