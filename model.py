@@ -5,11 +5,6 @@ import numpy as np
 
 OPPOSITE = {1: 0, 0: 1}
 STATUSES = {0: 'MAL', 1: 'NORM', 2: 'MAL_OP', 3: 'MAL_REP'}
-# STATUSES:
-# 0: PURE MALICIOUS
-# 1: NORMAL
-# 2: MALICIOUS OPERATING
-# 3: MALICIOUS REPORTING
 
 class AV:
     def __init__(self, model, vID, status):
@@ -20,7 +15,7 @@ class AV:
     def __repr__(self):
         return self.vID + f"({STATUSES[self.status]})"
 
-    def broadcast(self, recipients, noise=0.95):
+    def broadcast(self, recipients, noise=0.05):
         witnesses = random.sample(recipients, int(len(recipients)*random.random()*0.5+1)) # picks n number of witnesses where n is between 0 and 50% of the recipients
         r = random.choice(self.model.RSUs) # pick a random RSU
         transaction = {} # key is witness, value is witness's score
@@ -29,29 +24,27 @@ class AV:
         if random.random() < noise:
             expectedValue = OPPOSITE[expectedValue]
         for w in witnesses:
-           transaction[w] = w.score(self, expectedValue, 0.95) # have each witness score the transaction
+           transaction[w] = w.score(self, expectedValue) # have each witness score the transaction
         r.addTransaction(transaction)
         r.updateOperatingRep(self, transaction, 0.05, True, True)
         for w in witnesses:
            r.updateReportingRep(w, transaction, 0.05, weightWitnessRep=True) # update the reputation of each witness
 
-    def score(self, sender, expected, quartiles=True, noise=0.95):
+    def score(self, sender, expected, quartiles=False, noise=0.05):
         #score must take into account the status of the AV that is witnessing the transaction
         # score = random.choice([0, 1]) # make it depend on status
         # if a vehicle that is scoring a transaction has its reputation fall below 0.4 disregards the scoring from the vehicle
-        scores = [0, 0.25, 0.75, 1]
+        scores = [0, 0.25, 0.5, 0.75, 1.0]
         wScore = -99
         if quartiles:
             wScore = expected if self.status in [1, 2] else OPPOSITE[expected]
             if random.random() < noise:
                 wScore = random.choice([i for i in scores if i != wScore])
-
         else:
             wScore = expected if self.status in [1, 2] else OPPOSITE[expected]
             if random.random() < noise:
                 wScore = OPPOSITE[wScore]
         return wScore
-        # add nuance; good vehicles sometimes give bad scores
 
 class RSU:
 
@@ -97,16 +90,15 @@ class RSU:
         # TO-DO weight based on recency AND number of witnesses
         
 
-    def updateReportingRep(self, witness, transaction, velocity, weightWitnessRep=True, quartiles=True):
+    def updateReportingRep(self, witness, transaction, velocity, weightWitnessRep=True, quartiles=False):
         # Calculate the average score based on the same method as used in Operating Reputation
         # 0.2 rep vehicle (malicious) reports 0 on a good transaction and 0.9 rep vehicle (non-malicious) reports 1 on a good transaction
         if quartiles:
            rRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
            snapped = round(rRep*4)/4
            match = 1 if snapped == transaction[witness] else 0
-           deviation = 1 - abs(transaction[witness] - rRep)
            currRep = self.reporting_scores[witness]
-           self.reporting_scores[witness] = deviation * velocity + currRep * (1-velocity)
+           self.reporting_scores[witness] = match * velocity + currRep * (1-velocity)
  
         else:
             rRep = 0
@@ -130,6 +122,7 @@ class Model:
         numN = int(round(nAVs*propNormal))
         numM = int(round(nAVs*(1-propNormal)))
         statuses = [1]*numN + [0]*numM
+        # implement other statues
         self.AVs = [AV(self, f"AV_{i}", statuses[i]) for i in range(nAVs)]
         self.nAVs = self.AVs[:numN] # normal AVs
         self.mAVs = self.AVs[numN:] # malicious AVs
