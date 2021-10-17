@@ -119,13 +119,15 @@ class Model:
         # 270 status 0, 15 status 1, 10 status 2, 5 status 3
         # Decide how many AVs of each type (not random -> could use proportions later on in the simulation)
         # 90% good vehicles and 10% malicous vehicles
-        numN = int(round(nAVs*propNormal))
-        numM = int(round(nAVs*(1-propNormal)))
-        statuses = [1]*numN + [0]*numM
+        numNORM = int(round(nAVs*propNormal))
+        numMAL = int(round(nAVs*((1-propNormal)/3)))
+        numMAL_OP = int(round(nAVs*((1-propNormal)/3)))
+        numMAL_REP = int(round(nAVs*((1-propNormal)/3)))
+        statuses = [1]*numNORM + [0]*numMAL + [2]*numMAL_OP + [3]*numMAL_REP
         # implement other statues
         self.AVs = [AV(self, f"AV_{i}", statuses[i]) for i in range(nAVs)]
-        self.nAVs = self.AVs[:numN] # normal AVs
-        self.mAVs = self.AVs[numN:] # malicious AVs
+        self.nAVs = self.AVs[:numNORM] # normal AVs
+        self.mAVs = self.AVs[numNORM:] # malicious AVs
 
         self.RSUs = [RSU(self, f"RSU_{i}") for i in range(nRSUs)]
         # self.current_tick = 0
@@ -200,7 +202,7 @@ class Model:
             print(f"Operating Error: {self.calculateOperatingError()}")
             print(f"Reporting Error: {self.calculateReportingError()}")
 
-model = Model(30, 1, 0.9) # start off with 1 rsu
+model = Model(33, 1, 0.9) # start off with 1 rsu
 model.run(2000)
 # scores = model.RSUs[0].operating_scores
 model.plotScores()
