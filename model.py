@@ -103,13 +103,13 @@ class AV:
         scores = [0, 0.25, 0.5, 0.75, 1.0]
         wScore = -99
         if quartiles:
+            wScore = expected if self.status in [1, 2] else OPPOSITE[expected] # if the vehicle is normal or malicious operating, rate accurately
+            if random.random() < noise:
+                wScore = random.choice([i for i in scores if i != wScore]) # if there's noise, randomly pick a different score
+        else: # use binary scores
             wScore = expected if self.status in [1, 2] else OPPOSITE[expected]
             if random.random() < noise:
-                wScore = random.choice([i for i in scores if i != wScore])
-        else:
-            wScore = expected if self.status in [1, 2] else OPPOSITE[expected]
-            if random.random() < noise:
-                wScore = OPPOSITE[wScore]
+                wScore = OPPOSITE[wScore] # if there's noise, flip the score
         return wScore
 
 class RSU:
@@ -127,7 +127,7 @@ class RSU:
 
     def addTransaction(self, newT): 
         # update avg witnesses
-        self.avgWitnesses = ((self.avgWitnesses * len(self.transactions)) + len(newT)) / (len(self.transactions) + 1)
+        self.avgWitnesses = ((self.avgWitnesses * len(self.transactions)) + len(newT)) / (len(self.transactions) + 1) # recompute average number of witnesses per transaction
         # note: does not update prior transactions
         self.transactions.append(newT)
 
@@ -135,49 +135,52 @@ class RSU:
         # update the reputation of sender AV using the transaction
         # does this by iterating through the witness scores for the transaction and get weighted average
         oRep = 0
-        repSum = sum([self.reporting_scores[w] for w in transaction.keys()])
+        repSum = sum([self.reporting_scores[w] for w in transaction.keys()]) # get total reputation of every witness
         if weightWitnessRep:
             for w in transaction.keys():
-                weight = self.reporting_scores[w] / repSum
+                weight = self.reporting_scores[w] / repSum # each vehicle's weight is based on their reputation relative to the sum of all the witnesses' reputations
                 oRep += transaction[w] * weight
         else: # not weighting by witness reputations
-            oRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
+            oRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys()) # simple average
 
         if weightNumWitnesses:
             k = 2
             diff = len(transaction) - self.avgWitnesses
             shift = diff / k
-            velocity += (shift*0.01)
+            velocity += (shift*0.01) # shift the velocity by a value proportional to the difference between the number of witnesses for this transaction and the average across the entire simulation
 
         currRep = self.operating_scores[sender]
         
         self.operating_scores[sender] = oRep * velocity + currRep * (1-velocity) # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
         # update reputation for every RSU
-        # TO-DO weight based on recency AND number of witnesses
+        # TO-DO weight based on recency
         
 
     def updateReportingRep(self, witness, transaction, velocity=PARAMS[0], weightWitnessRep=True, quartiles=PARAMS[12]):
         # Calculate the average score based on the same method as used in Operating Reputation
         # 0.2 rep vehicle (malicious) reports 0 on a good transaction and 0.9 rep vehicle (non-malicious) reports 1 on a good transaction
         if quartiles:
-           rRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
-           snapped = round(rRep*4)/4
-           match = 1 if snapped == transaction[witness] else 0
+            # TO-DO: implement weightWitnessRep here
+           rRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys()) # average rating of the transaction (based on every witness's score)
+           snapped = round(rRep*4)/4 # snap the average rating to one of the quartile values
+           match = 1 if snapped == transaction[witness] else 0 # if the snapped value is the same as what the witness rated it, then good
            currRep = self.reporting_scores[witness]
            self.reporting_scores[witness] = match * velocity + currRep * (1-velocity)
- 
         else:
             rRep = 0
             if weightWitnessRep:
-                repSum = sum([self.reporting_scores[w] for w in transaction.keys()])
+                # TO-DO: doesn't feel completely right; why is the weighted average being calculated again when it's already done in updateOperatingRep()?
+                #        can be simplified: store the score of the transaction somewhere after updateOperatingRep is called; then access it here without recalculating
+                repSum = sum([self.reporting_scores[w] for w in transaction.keys()]) # sum of all the witnesses reputations 
                 for w in transaction.keys():
-                    weight = self.reporting_scores[w] / repSum
-                    rRep += transaction[w] * weight
+                    weight = self.reporting_scores[w] / repSum # each witnesses weight is based on their reputation relative to the sum
+                    rRep += transaction[w] * weight # score of the transaction
             else: # not weighting by witness reputations
                 rRep = sum([transaction[w] for w in transaction.keys()])/len(transaction.keys())
-            deviation = 1 - abs(transaction[witness] - rRep)
+            deviation = abs(transaction[witness] - rRep) # deviation is difference between witness's score and average score (subtracted from 1 so that )
+            rScore = 1 - deviation # lower deviation is better
             currRep = self.reporting_scores[witness]
-            self.reporting_scores[witness] = deviation * velocity + currRep * (1-velocity)
+            self.reporting_scores[witness] = rScore * velocity + currRep * (1-velocity)
 
 
 class Model:
@@ -201,14 +204,8 @@ class Model:
     def initialize_reputations(self):
         for r in self.RSUs:
             r.operating_scores = {av: 1.0 for av in self.AVs} # give each av a default of 1.0
-            r.reporting_scores = {av: 1.0 for av in self.AVs} # give each av a default of 1.0
+            r.reporting_scores = {av: 1.0 for av in self.AVs} 
     
-    def step(self):
-        # tick = self.current_tick % 1440 # get tick of current day
-        # if tick is 0:
-        #     # end of day
-        pass
-        
     def plotScores(self, showOperating=True, showReporting=True):
         oScores = self.RSUs[0].operating_scores
         rScores = self.RSUs[0].reporting_scores
@@ -236,17 +233,17 @@ class Model:
         err = 0
         op_scores = self.RSUs[0].operating_scores
         for av in op_scores:
-            expectedRep = 1 if av.status in [1, 3] else 0
-            err += abs(expectedRep - op_scores[av])
-        return err / len(op_scores)
+            expectedRep = 1 if av.status in [1, 3] else 0 # for normal and malicious operating vehicles, their expected operating reputation is 1
+            err += abs(expectedRep - op_scores[av]) # compute difference between expected score and actual reputation 
+        return err / len(op_scores) # get average difference
 
     def calculateReportingError(self):
         err = 0
         re_scores = self.RSUs[0].reporting_scores
         for av in re_scores:
-            expectedRep = 1 if av.status in [1, 2] else 0
-            err += abs(expectedRep - re_scores[av])
-        return err / len(re_scores)
+            expectedRep = 1 if av.status in [1, 2] else 0 # for normal and malicious reporting vehicles, their expected reporting reputation is 1
+            err += abs(expectedRep - re_scores[av]) # compute difference between expected score and actual reputation
+        return err / len(re_scores) # get average difference
 
     def turn(self):
         prob = random.random()
@@ -255,7 +252,7 @@ class Model:
                 av = random.choice(self.mAVs) # pick a malicious AV
             else:
                 av = random.choice(self.nAVs) # pick a normal AV
-            # move recipient selection into av.broadcast
+            # TO-DO: move recipient selection into av.broadcast
             nRecipients = int(random.random()*(PARAMS[8]-PARAMS[7])+PARAMS[7])
             recipients = random.sample([v for v in self.AVs if v is not av], nRecipients) # pick recipients as long as they aren't the sender
             av.broadcast(recipients)
