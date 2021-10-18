@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import time
 import numpy as np
 import sys
+import os
+
 OPPOSITE = {1: 0, 0: 1}
 STATUSES = {0: 'MAL', 1: 'NORM', 2: 'MAL_OP', 3: 'MAL_REP'}
 
@@ -260,6 +262,7 @@ class Model:
 
     def run(self, n_turns=PARAMS[13], print_error=True):
         # include runtime
+        start = time.time()
         self.initialize_reputations()
         for i in range(n_turns):
             self.turn()
@@ -267,10 +270,29 @@ class Model:
         if print_error:
             print(f"Operating Error: {self.calculateOperatingError()}")
             print(f"Reporting Error: {self.calculateReportingError()}")
+        end = time.time()
+        self.runtime = end-start
+    
+    def save_output(self, filename="output.csv"):
+        newFile = False
+        if not os.path.exists(filename):
+            newFile = True
+        with open(filename, "a") as f:
+            if newFile:
+                print("hi")
+                f.write("runtime,velocity,byWitnessRep,byNumWitnesses,propNormal,broadcastNoise,witnessNoise,numVehicles,minRecipients,maxRecipients,propWitnesses,useMalOp,useMalRep,useQuartiles,numTurns,percTransaction,percMalicious,operatingScores,reportingScores")
+            out = []
+            out.append("\n" + str(self.runtime))
+            out.append(",".join([str(p) for p in PARAMS]))
+            out.append(f"\"{self.RSUs[0].operating_scores}\"")
+            out.append(f"\"{self.RSUs[0].reporting_scores}\"")
+            f.write(",".join(out))
         
 
 
 model = Model(33, 1, 0.9) # start off with 1 rsu
 model.run(2000)
 # scores = model.RSUs[0].operating_scores
+print("Runtime:", model.runtime, "seconds")
+model.save_output()
 model.plotScores()
