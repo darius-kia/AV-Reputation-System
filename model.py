@@ -10,23 +10,29 @@ STATUSES = {0: 'MAL', 1: 'NORM', 2: 'MAL_OP', 3: 'MAL_REP'}
 
 
 class Params:
-    def __init__(self, velocity=0.95, byWitnessRep=True, byNumWitnesses=True, propNormal=0.9, broadcastNoise=0.05, witnessNoise=0.05, numVehicles=30, minRecipients=10, maxRecipients=20, propWitnesses=0.5, useMalOp=True, useMalRep=True, useQuartiles=False, numTurns=5000, percTransaction=0.9, percMalicious=0.1):
+    def __init__(self, velocity=0.05, byWitnessRep=False, byNumWitnesses=False, kNumWitnesses=2, useQuartiles=False, numVehicles=100, minRecipients=5, maxRecipients=30, propWitnesses=0.5, propNormal=0.9, broadcastNoise=0.05, witnessNoise=0.05, useMalOp=False, useMalRep=False, numTurns=5000, percTransaction=0.9, percMalicious=0.1):
+        # system parameters
         self.velocity = velocity
         self.byWitnessRep = byWitnessRep
         self.byNumWitnesses = byNumWitnesses
-        self.propNormal = propNormal
-        self.broadcastNoise = broadcastNoise
-        self.witnessNoise = witnessNoise
+        self.kNumWitnesses = kNumWitnesses
+        self.useQuartiles = useQuartiles
+
+        # environment parameters
         self.numVehicles = numVehicles
         self.minRecipients = minRecipients
         self.maxRecipients = maxRecipients
         self.propWitnesses = propWitnesses
+        self.propNormal = propNormal
+        self.broadcastNoise = broadcastNoise
+        self.witnessNoise = witnessNoise
         self.useMalOp = useMalOp
         self.useMalRep = useMalRep
-        self.useQuartiles = useQuartiles
         self.numTurns = numTurns
         self.percTransaction = percTransaction
         self.percMalicious = percMalicious
+    def __repr__(self):
+        return f"{self.velocity},{self.byWitnessRep},{self.byNumWitnesses},{self.kNumWitnesses},{self.useQuartiles},{self.numVehicles},{self.minRecipients},{self.maxRecipients},{self.propWitnesses},{self.propNormal},{self.broadcastNoise},{self.witnessNoise},{self.useMalOp},{self.useMalRep},{self.numTurns},{self.percTransaction},percMalicious"
         
 args = sys.argv[1:]
 assert(len(args) == 16 or len(args) == 0), "Must include all arguments"
@@ -106,14 +112,13 @@ class RSU:
 
         velocity = PARAMS.velocity
         if PARAMS.byNumWitnesses:
-            k = 2
             diff = len(transaction) - self.avgWitnesses
-            shift = diff / k
+            shift = diff / PARAMS.kNumWitnesses
             velocity += (shift*0.01) # shift the velocity by a value proportional to the difference between the number of witnesses for this transaction and the average across the entire simulation
 
         currRep = self.operating_scores[sender]
         
-        self.operating_scores[sender] = oRep * velocity + currRep * (1-velocity) # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
+        self.operating_scores[sender] = oRep * (velocity) + currRep * (1-velocity) # maybe change: first few transactions shouldn't have 95% weight; maybe have the 95 start off low and get higher over time
         # update reputation for every RSU
         # TO-DO weight based on recency
         
@@ -127,7 +132,7 @@ class RSU:
            snapped = round(rRep*4)/4 # snap the average rating to one of the quartile values
            match = 1 if snapped == transaction[witness] else 0 # if the snapped value is the same as what the witness rated it, then good
            currRep = self.reporting_scores[witness]
-           self.reporting_scores[witness] = match * PARAMS.velocity + currRep * (1-PARAMS.velocity)
+           self.reporting_scores[witness] = match * (PARAMS.velocity) + currRep * (1-PARAMS.velocity)
         else:
             rRep = 0
             if PARAMS.byWitnessRep:
@@ -142,7 +147,7 @@ class RSU:
             deviation = abs(transaction[witness] - rRep) # deviation is difference between witness's score and average score (subtracted from 1 so that )
             rScore = 1 - deviation # lower deviation is better
             currRep = self.reporting_scores[witness]
-            self.reporting_scores[witness] = rScore * PARAMS.velocity + currRep * (1-PARAMS.velocity)
+            self.reporting_scores[witness] = rScore * (PARAMS.velocity) + currRep * (1-PARAMS.velocity)
 
 
 class Model:
@@ -153,10 +158,21 @@ class Model:
         nAVs = PARAMS.numVehicles
         propNormal = PARAMS.propNormal
         numNORM = int(round(nAVs*propNormal))
-        numMAL = int(round(nAVs*((1-propNormal)/3)))
-        numMAL_OP = int(round(nAVs*((1-propNormal)/3)))
-        numMAL_REP = int(round(nAVs*((1-propNormal)/3)))
-        statuses = [1]*numNORM + [0]*numMAL + [2]*numMAL_OP + [3]*numMAL_REP
+        numMAL, numMAL_OP, numMAL_REP = 0, 0, 0
+        if PARAMS.useMalOp and not PARAMS.useMalRep:
+            numMAL = int(round(nAVs*((1-propNormal)/2)))
+            numMAL_OP = int(round(nAVs*((1-propNormal)/2)))
+        elif PARAMS.useMalOp and PARAMS.useMalRep:
+            numMAL = int(round(nAVs*((1-propNormal)/2)))
+            numMAL_REP = int(round(nAVs*((1-propNormal)/2)))
+        elif PARAMS.useMalOp and PARAMS.useMalRep:
+            numMAL = int(round(nAVs*((1-propNormal)/3)))
+            numMAL_OP = int(round(nAVs*((1-propNormal)/3)))
+            numMAL_REP = int(round(nAVs*((1-propNormal)/3)))
+        else:
+            numMAL = int(round(nAVs*(1-propNormal)))
+        statuses = [0]*numMAL + [1]*numNORM + [2]*numMAL_OP + [3]*numMAL_REP
+
         # implement other statues
         self.AVs = [AV(self, f"AV_{i}", statuses[i]) for i in range(nAVs)]
         self.nAVs = self.AVs[:numNORM] # normal AVs
@@ -240,10 +256,10 @@ class Model:
             newFile = True
         with open(filename, "a") as f:
             if newFile:
-                f.write("runtime,velocity,byWitnessRep,byNumWitnesses,propNormal,broadcastNoise,witnessNoise,numVehicles,minRecipients,maxRecipients,propWitnesses,useMalOp,useMalRep,useQuartiles,numTurns,percTransaction,percMalicious,operatingScores,reportingScores")
+                f.write("runtime,velocity,byWitnessRep,byNumWitnesses,kNumWitnesses,useQuartiles,numVehicles,minRecipients,maxRecipients,propWitnesses,propNormal,broadcastNoise,witnessNoise,useMalOp,useMalRep,numTurns,percTransaction,percMalicious,operatingScores,reportingScores")
             out = []
             out.append("\n" + str(self.runtime))
-            out.append(",".join([str(p) for p in PARAMS]))
+            out.append(str(PARAMS))
             out.append(f"\"{self.RSUs[0].operating_scores}\"")
             out.append(f"\"{self.RSUs[0].reporting_scores}\"")
             f.write(",".join(out))
@@ -252,9 +268,9 @@ class Model:
 
 
 model = Model() # start off with 1 rsu
-model.run()
+model.run(print_error=False)
 # scores = model.RSUs[0].operating_scores
 # print(scores)
 # print("Runtime:", model.runtime, "seconds")
-# model.save_output()
+model.save_output()
 # model.plotScores()
