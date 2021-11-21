@@ -33,7 +33,7 @@ class Params:
         self.percMalicious = float(percMalicious)
 
     def __repr__(self):
-        return f"{self.velocity},{self.byWitnessRep},{self.byNumWitnesses},{self.kNumWitnesses},{self.useQuartiles},{self.numVehicles},{self.minRecipients},{self.maxRecipients},{self.propWitnesses},{self.propNormal},{self.broadcastNoise},{self.witnessNoise},{self.useMalOp},{self.useMalRep},{self.numTurns},{self.percTransaction},percMalicious"
+        return f"{self.velocity},{self.byWitnessRep},{self.byNumWitnesses},{self.kNumWitnesses},{self.useQuartiles},{self.numVehicles},{self.minRecipients},{self.maxRecipients},{self.propWitnesses},{self.propNormal},{self.broadcastNoise},{self.witnessNoise},{self.useMalOp},{self.useMalRep},{self.numTurns},{self.percTransaction},{self.percMalicious}"
 
 
 args = sys.argv[1:]
