@@ -12,30 +12,30 @@ STATUSES = {0: 'MAL', 1: 'NORM', 2: 'MAL_OP', 3: 'MAL_REP'}
 class Params:
     def __init__(self, velocity=0.05, byWitnessRep=False, byNumWitnesses=False, kNumWitnesses=2, useQuartiles=False, numVehicles=100, minRecipients=5, maxRecipients=30, propWitnesses=0.5, propNormal=0.9, broadcastNoise=0.05, witnessNoise=0.05, useMalOp=False, useMalRep=False, numTurns=5000, percTransaction=0.9, percMalicious=0.1):
         # system parameters
-        self.velocity = velocity
-        self.byWitnessRep = byWitnessRep
-        self.byNumWitnesses = byNumWitnesses
-        self.kNumWitnesses = kNumWitnesses
-        self.useQuartiles = useQuartiles
+        self.velocity = float(velocity)
+        self.byWitnessRep = byWitnessRep == "True"
+        self.byNumWitnesses = byNumWitnesses == "True"
+        self.kNumWitnesses = int(kNumWitnesses)
+        self.useQuartiles = useQuartiles == "True"
 
         # environment parameters
-        self.numVehicles = numVehicles
-        self.minRecipients = minRecipients
-        self.maxRecipients = maxRecipients
-        self.propWitnesses = propWitnesses
-        self.propNormal = propNormal
-        self.broadcastNoise = broadcastNoise
-        self.witnessNoise = witnessNoise
-        self.useMalOp = useMalOp
-        self.useMalRep = useMalRep
-        self.numTurns = numTurns
-        self.percTransaction = percTransaction
-        self.percMalicious = percMalicious
+        self.numVehicles = int(numVehicles)
+        self.minRecipients = int(minRecipients)
+        self.maxRecipients = int(maxRecipients)
+        self.propWitnesses = float(propWitnesses)
+        self.propNormal = float(propNormal)
+        self.broadcastNoise = float(broadcastNoise)
+        self.witnessNoise = float(witnessNoise)
+        self.useMalOp = useMalOp == "True"
+        self.useMalRep = useMalRep == "True"
+        self.numTurns = int(numTurns)
+        self.percTransaction = float(percTransaction)
+        self.percMalicious = float(percMalicious)
     def __repr__(self):
         return f"{self.velocity},{self.byWitnessRep},{self.byNumWitnesses},{self.kNumWitnesses},{self.useQuartiles},{self.numVehicles},{self.minRecipients},{self.maxRecipients},{self.propWitnesses},{self.propNormal},{self.broadcastNoise},{self.witnessNoise},{self.useMalOp},{self.useMalRep},{self.numTurns},{self.percTransaction},percMalicious"
         
 args = sys.argv[1:]
-assert(len(args) == 16 or len(args) == 0), "Must include all arguments"
+assert(len(args) == 17 or len(args) == 0), "Must include all arguments"
 PARAMS = Params(*args)
 
 
