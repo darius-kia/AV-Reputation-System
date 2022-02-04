@@ -4,13 +4,15 @@ import time
 import numpy as np
 import sys
 import os
+import pandas as pd
+from pandas.core.algorithms import value_counts
 
 OPPOSITE = {1: 0, 0: 1}
 STATUSES = {0: 'MAL', 1: 'NORM', 2: 'MAL_OP', 3: 'MAL_REP'}
 
 
 class Params:
-    def __init__(self, velocity=0.05, byWitnessRep=False, byNumWitnesses=False, kNumWitnesses=2, useQuartiles=False, numVehicles=100, minRecipients=5, maxRecipients=30, propWitnesses=0.5, propNormal=0.9, broadcastNoise=0.05, witnessNoise=0.05, useMalOp=False, useMalRep=False, numTurns=5000, percTransaction=0.9, percMalicious=0.1):
+    def __init__(self, velocity=0.05, byWitnessRep=False, byNumWitnesses=False, kNumWitnesses=2, useQuartiles=False, numVehicles=30, minRecipients=5, maxRecipients=30, propWitnesses=0.5, propNormal=0.9, broadcastNoise=0.05, witnessNoise=0.05, useMalOp=False, useMalRep=False, numTurns=5000, percTransaction=0.9, percMalicious=0.1):
         # system parameters
         self.velocity = float(velocity)
         self.byWitnessRep = byWitnessRep == "True"
@@ -48,7 +50,10 @@ class AV:
         self.status = status
 
     def __repr__(self):
-        return self.vID + f"({STATUSES[self.status]})"
+        # return self.vID + f"({STATUSES[self.status]})"
+        i = str(self.vID).index("_")
+        num = str(self.vID)[i+1:]
+        return f"{STATUSES[self.status]} {num}"
 
     def broadcast(self, recipients):
         # picks n number of witnesses where n is between 0 and k% of the recipients
@@ -230,11 +235,19 @@ class Model:
         if showReporting:
             plt.bar(X_axis + 0.2, y2, 0.4, label='Reporting')
 
+        vs = []
+        for i in self.AVs:
+            vs.append(str(i))
+
+        print(type(vs), type(oScores), type(rScores))
+        df = pd.DataFrame({'Vehicle ID': vs, 'Operating': oScores.values(), 'Reporting': rScores.values()})
+        df.to_csv("sim1.csv")
         plt.xticks(X_axis, X, rotation=90)
         plt.xlabel("Vehicles")
         plt.ylabel("Score")
         plt.title("AV Operating and Reporting Scores")
         plt.legend()
+        plt.savefig("fig.png")
         plt.show()
 
     def calculateOperatingError(self):
@@ -306,4 +319,4 @@ model.run(print_error=False)
 # print(scores)
 # print("Runtime:", model.runtime, "seconds")
 model.save_output()
-# model.plotScores()
+model.plotScores()

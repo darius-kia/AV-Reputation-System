@@ -25,4 +25,4 @@ sparsePop = s8[
     (s8['kNumWitnesses'] == 2.0) &
     (s8['useQuartiles'] == False)
 ][['numVehicles', 'minRecipients', 'maxRecipients', 'operatingError', 'reportingError']]
-sparsePop.to_csv("10_malFreq.csv")
+sparsePop.to_csv("11_sparsePop.csv")
