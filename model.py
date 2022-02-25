@@ -312,11 +312,14 @@ class Model:
             out.append(f"\"{self.RSUs[0].reporting_scores}\"")
             f.write(",".join(out))
 
+def main():
+    model = Model()  # start off with 1 rsu
+    model.run(print_error=False)
+    # scores = model.RSUs[0].operating_scores
+    # print(scores)
+    # print("Runtime:", model.runtime, "seconds")
+    model.save_output()
+    model.plotScores()
 
-model = Model()  # start off with 1 rsu
-model.run(print_error=False)
-# scores = model.RSUs[0].operating_scores
-# print(scores)
-# print("Runtime:", model.runtime, "seconds")
-model.save_output()
-model.plotScores()
+if __name__ == "__main__":
+    main()
