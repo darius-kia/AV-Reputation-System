@@ -6,13 +6,14 @@ import sys
 import os
 import pandas as pd
 from pandas.core.algorithms import value_counts
+from db import Transaction, Block, Blockchain
 
 OPPOSITE = {1: 0, 0: 1}
 STATUSES = {0: 'MAL', 1: 'NORM', 2: 'MAL_OP', 3: 'MAL_REP'}
 
 
 class Params:
-    def __init__(self, velocity=0.05, byWitnessRep=False, byNumWitnesses=False, kNumWitnesses=2, useQuartiles=False, numVehicles=30, minRecipients=5, maxRecipients=30, propWitnesses=0.5, propNormal=0.9, broadcastNoise=0.05, witnessNoise=0.05, useMalOp=False, useMalRep=False, numTurns=5000, percTransaction=0.9, percMalicious=0.1):
+    def __init__(self, velocity=0.05, byWitnessRep=False, byNumWitnesses=False, kNumWitnesses=2, useQuartiles=False, numVehicles=30, minRecipients=5, maxRecipients=30, propWitnesses=0.5, propNormal=0.9, broadcastNoise=0.05, witnessNoise=0.05, useMalOp=False, useMalRep=False, numTurns=50, percTransaction=0.9, percMalicious=0.1):
         # system parameters
         self.velocity = float(velocity)
         self.byWitnessRep = byWitnessRep == "True"
@@ -55,11 +56,12 @@ class AV:
         num = str(self.vID)[i+1:]
         return f"{STATUSES[self.status]} {num}"
 
-    def broadcast(self, recipients):
+    def broadcast(self, recipients, r=None):
         # picks n number of witnesses where n is between 0 and k% of the recipients
         witnesses = random.sample(recipients, int(
             len(recipients)*random.random()*PARAMS.propWitnesses+1))
-        r = random.choice(self.model.RSUs)  # pick a random RSU
+        if r is None:
+            r = random.choice(self.model.RSUs)  # pick a random RSU
         transaction = {}  # key is witness, value is witness's score
 
         expectedValue = 1 if self.status in [1, 3] else 0
@@ -101,7 +103,6 @@ class RSU:
         # key is the av, value is its current reputation; should be stored by BS, RSU stores transaction info
         self.operating_scores = {}
         self.reporting_scores = {}
-        self.transactions = []
         self.avgWitnesses = 0
 
     def __repr__(self):
@@ -109,10 +110,12 @@ class RSU:
 
     def addTransaction(self, newT):
         # update avg witnesses
-        self.avgWitnesses = ((self.avgWitnesses * len(self.transactions)) + len(newT)) / (
-            len(self.transactions) + 1)  # recompute average number of witnesses per transaction
+        self.avgWitnesses = ((self.avgWitnesses * self.model.blockchain.numTransactions) + len(newT)) / (
+            self.model.blockchain.numTransactions + 1)  # recompute average number of witnesses per transaction
         # note: does not update prior transactions
-        self.transactions.append(newT)
+        self.model.blockchain.addTransaction(newT)
+        if len(self.model.blockchain.pendingTransactions) >= 20: # arbitrary block size
+            self.model.blockchain.mineBlock(self.rID)
 
     def updateOperatingRep(self, sender, transaction):
         # update the reputation of sender AV using the transaction
@@ -212,6 +215,7 @@ class Model:
 
         self.RSUs = [RSU(self, f"RSU_{i}") for i in range(nRSUs)]
         # self.current_tick = 0
+        self.blockchain = Blockchain(2, 0)
 
     def initialize_reputations(self):
         for r in self.RSUs:
@@ -292,6 +296,7 @@ class Model:
         for i in range(PARAMS.numTurns):
             self.turn()
         # for (int i = 0; i < n_days; i++){ broadcast ()}
+        self.blockchain.printChain()
         if print_error:
             print(f"Operating Error: {self.calculateOperatingError()}")
             print(f"Reporting Error: {self.calculateReportingError()}")
@@ -314,12 +319,12 @@ class Model:
 
 def main():
     model = Model()  # start off with 1 rsu
-    model.run(print_error=False)
+    model.run(print_error=True)
     # scores = model.RSUs[0].operating_scores
     # print(scores)
     # print("Runtime:", model.runtime, "seconds")
-    model.save_output()
-    model.plotScores()
+    # model.save_output()
+    # model.plotScores()
 
 if __name__ == "__main__":
     main()
