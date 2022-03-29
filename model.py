@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import time
 import numpy as np
 import sys
+import threading
 import os
 import pandas as pd
 from pandas.core.algorithms import value_counts
@@ -13,7 +14,7 @@ STATUSES = {0: 'MAL', 1: 'NORM', 2: 'MAL_OP', 3: 'MAL_REP'}
 
 
 class Params:
-    def __init__(self, velocity=0.05, byWitnessRep=False, byNumWitnesses=False, kNumWitnesses=2, useQuartiles=False, numVehicles=30, minRecipients=5, maxRecipients=30, propWitnesses=0.5, propNormal=0.9, broadcastNoise=0.05, witnessNoise=0.05, useMalOp=False, useMalRep=False, numTurns=50, percTransaction=0.9, percMalicious=0.1):
+    def __init__(self, velocity=0.05, byWitnessRep=False, byNumWitnesses=False, kNumWitnesses=2, useQuartiles=False, numVehicles=30, minRecipients=5, maxRecipients=30, propWitnesses=0.5, propNormal=0.9, broadcastNoise=0.05, witnessNoise=0.05, useMalOp=False, useMalRep=False, numTurns=1000, percTransaction=0.9, percMalicious=0.1):
         # system parameters
         self.velocity = float(velocity)
         self.byWitnessRep = byWitnessRep == "True"
@@ -104,9 +105,19 @@ class RSU:
         self.operating_scores = {}
         self.reporting_scores = {}
         self.avgWitnesses = 0
+        self.isMining = False
 
     def __repr__(self):
         return self.rID
+
+    def mineBlock(self, id):
+        blockNum = len(self.model.blockchain.chain)
+        self.isMining = True
+        print(f"Started mining Block #{blockNum}")
+        self.model.blockchain.mineBlock(id)
+        self.isMining = False
+        # print(f"Finished mining Block #{blockNum}")
+        # self.model.blockchain.printChain()
 
     def addTransaction(self, newT):
         # update avg witnesses
@@ -114,8 +125,9 @@ class RSU:
             self.model.blockchain.numTransactions + 1)  # recompute average number of witnesses per transaction
         # note: does not update prior transactions
         self.model.blockchain.addTransaction(newT)
-        if len(self.model.blockchain.pendingTransactions) >= 20: # arbitrary block size
-            self.model.blockchain.mineBlock(self.rID)
+        if len(self.model.blockchain.pendingTransactions) >= 100 and not self.isMining: # arbitrary block size
+            x = threading.Thread(target=self.mineBlock, args=(self.rID,))
+            x.start()
 
     def updateOperatingRep(self, sender, transaction):
         # update the reputation of sender AV using the transaction
@@ -216,6 +228,7 @@ class Model:
         self.RSUs = [RSU(self, f"RSU_{i}") for i in range(nRSUs)]
         # self.current_tick = 0
         self.blockchain = Blockchain(2, 0)
+        self.numTrans = 0
 
     def initialize_reputations(self):
         for r in self.RSUs:
@@ -277,6 +290,8 @@ class Model:
     def turn(self):
         prob = random.random()
         if prob < PARAMS.percTransaction:
+            self.numTrans += 1
+            print("transaction" + str(self.numTrans))
             if prob > (PARAMS.percTransaction - PARAMS.percMalicious):
                 av = random.choice(self.mAVs)  # pick a malicious AV
             else:
@@ -296,7 +311,9 @@ class Model:
         for i in range(PARAMS.numTurns):
             self.turn()
         # for (int i = 0; i < n_days; i++){ broadcast ()}
+        self.blockchain.mineBlock(-1) # mine remaining transactions
         self.blockchain.printChain()
+        print(self.numTrans, self.blockchain.numTransactions)
         if print_error:
             print(f"Operating Error: {self.calculateOperatingError()}")
             print(f"Reporting Error: {self.calculateReportingError()}")

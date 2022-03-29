@@ -40,6 +40,7 @@ class Blockchain:
         self.pendingTransactions = [] # fill with Transaction objects
         self.chain = [self.createGenesisBlock()] # may be revised
         self.numTransactions = 1
+        self.isMining = False
 
     def addTransaction(self, transaction):
         self.pendingTransactions.append(transaction)
@@ -49,12 +50,11 @@ class Blockchain:
         self.pendingTransactions.append(minerRewardTransaction)
 
         block = Block(datetime.now(), self.pendingTransactions, self.chain[-1].hash)
+        self.pendingTransactions = []
         block.mineBlock(self.proofOfWorkDifficulty)
-        print(block.hash)
 
         self.chain.append(block)
         self.numTransactions += len(self.pendingTransactions)
-        self.pendingTransactions = []
     
     def isValidChain(self):
         for i in range(1, len(self.chain)):
@@ -73,9 +73,11 @@ class Blockchain:
         return Block(datetime.now(), transactions, "0")
 
     def printChain(self):
-        print("------------")
-        for b in self.chain:
+        print("############")
+        for b in self.chain[:-1]:
             print(b)
             print("------------")
+        print(self.chain[-1])
+        print("############")
 
 
